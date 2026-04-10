@@ -30,3 +30,5 @@ EXPOSE 8080
 
 # Ponto de entrada da aplicação
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
+
