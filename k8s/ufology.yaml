@@ -1,0 +1,199 @@
+---
+# ============================================================
+# MISSÃO 1 – Namespace
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ufology
+
+---
+# ============================================================
+# MISSÃO 1 – Deployment PostgreSQL
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: ufology
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: leogloriainfnet/ufodb:latest
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "devops2025!"
+            - name: POSTGRES_DB
+              value: "ufology"
+
+---
+# ============================================================
+# MISSÃO 1 – Service PostgreSQL
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: ufology
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# ============================================================
+# MISSÃO 2 – Deployment Redis
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: ufology
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+
+---
+# ============================================================
+# MISSÃO 2 – Service Redis
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: ufology
+spec:
+  selector:
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
+
+---
+# ============================================================
+# MISSÃO 4 – ConfigMap
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: ufology
+data:
+  DB_NAME: "ufology"
+
+---
+# ============================================================
+# MISSÃO 4 – Secret
+# ============================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secret
+  namespace: ufology
+type: Opaque
+stringData:
+  DB_PASSWORD: "devops2025!"
+
+---
+# ============================================================
+# MISSÃO 4 – Deployment da aplicação ufoTracker
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ufo-tracker
+  namespace: ufology
+  labels:
+    app: ufo-tracker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ufo-tracker
+  template:
+    metadata:
+      labels:
+        app: ufo-tracker
+    spec:
+      containers:
+        - name: ufo-tracker
+          image: juliactallarico/ufo-tracker:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_NAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/$(DB_NAME)"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+            - name: SPRING_REDIS_HOST
+              value: "redis"
+            - name: SPRING_REDIS_PORT
+              value: "6379"
+
+---
+# ============================================================
+# MISSÃO 4 – Service da aplicação ufoTracker
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: ufo-tracker
+  namespace: ufology
+spec:
+  selector:
+    app: ufo-tracker
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
